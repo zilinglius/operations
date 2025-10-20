@@ -16,8 +16,6 @@
 - OS：Linux（x86_64，内核 ≥ 5.4，需 `sudo`）
 - Go 基础（示例服务为 Go）
 
-**评分建议**：记录 30%｜定位分析 40%｜优化复测 20%｜拓扑与局限标注 10%。
-
 ---
 
 ## 快速约定（请先设置）
@@ -32,6 +30,8 @@ export SERVER_ADDR=$(ip route get 1.1.1.1 | awk '{for(i=1;i<=NF;i++) if($i=="src
 export SERVER_PORT=8080
 
 # 3) 安全防护提示：确保本机防火墙/云安全组放通 $SERVER_PORT/tcp
+
+# 4) 文中所有的观测脚本中的几乎每一行命令基本都需要在独立的终端中运行，注意识别命令观测的指标，观测不同指标的命令需要分工完成，不要直接复制在一个终端运行全部命令
 ```
 
 > 说明：**不要**使用 `127.0.0.1`；在“单机模式”即便使用本机的内网地址，连接仍可能经内核的本地路径，**不会产生真实 NIC/IRQ 成本**——这属于单机模式的已知局限，但不影响 CPU/GC/锁/本机 I/O 等实验。
@@ -59,7 +59,7 @@ echo 'export PATH=$HOME/FlameGraph:$PATH' >> ~/.bashrc && source ~/.bashrc
 | 模式 | 适用目标 | 优点 | 局限 | 本指导书绑定场景 |
 |---|---|---|---|---|
 | **单机**（服务与压测同一台） | 应用内部热点：CPU/GC/锁/syscall，本机磁盘 I/O | 成本低、复现快 | 本机路径不含真实 NIC；进程争用 CPU/LLC | `/cpu`、`/io`、`/alloc`、syscall/锁、**系统基线** |
-| **网络隔离**（namespace+veth+tc） | 演示时延/带宽/丢包对 RPS/尾延迟影响 | 无需第二台；可注入网络条件 | 无真实 NIC/IRQ；需 NAT | **仅无第二台机器时**替代网络实验 |
+| **网络隔离**（namespace+veth+tc） | 演示时延/带宽/丢包对 RPS/尾延迟影响 | 无需第二台；可注入网络条件 | 无真实 NIC/IRQ；需 NAT | **仅无第二台机器时**替代网络实验，这种模式可以先不考虑，如有更多时间可以尝试 |
 | **多机**（负载机 ↔ 服务机） | 端到端容量、网络/NIC/IRQ/队列调优 | 最接近生产 | 需要第二台主机 | 轻载连通性、网络容量与 SLA 对照 |
 
 > 访问统一使用 `http://$SERVER_ADDR:$SERVER_PORT/...`（**$SERVER_ADDR 不能是 127.0.0.1**）。
@@ -188,12 +188,12 @@ curl -s http://$SERVER_ADDR:$SERVER_PORT/debug/pprof/
 
 ---
 
-## 具体实验步骤（已绑定最佳模式）
+## 具体实验步骤
 
 > 记录：硬件、CPU 与频率策略、内核版本、所用模式，以及关键输出与截图。
 
 ### 步骤 0：系统基线（**单机模式**，可加多机对照）
-在**服务机**记录空闲基线：
+在**服务机**记录空闲性能基线（命令如下，具体功能请大家自行了解，这些命令可以分工完成，后续步骤中同理）：
 ```bash
 mpstat -P ALL 1
 iostat -xz 1
@@ -207,7 +207,7 @@ ss -s
 
 ### 步骤 1：轻载连通性（**多机模式**）
 **目的**：验证端到端可达与基础延迟。  
-在**负载机**：
+在**负载机**执行下面命令，其中的参数可以根据实际情况调整以找到最真实的性能指标，后续实验同理：
 ```bash
 wrk -t2 -c20 -d15s http://$SERVER_ADDR:$SERVER_PORT/
 ```
@@ -218,7 +218,7 @@ wrk -t2 -c20 -d15s http://$SERVER_ADDR:$SERVER_PORT/
 
 ### 步骤 2：CPU 瓶颈（/cpu，**单机模式**）
 **目的**：定位算力热点。  
-压测（示例在服务机执行）：
+压测（示例在服务机执行），关注url中n的取值，可根据具体情况微调：
 ```bash
 wrk -t4 -c50 -d30s "http://$SERVER_ADDR:$SERVER_PORT/cpu?n=42"
 ```
@@ -229,6 +229,7 @@ mpstat -P ALL 1
 vmstat 1
 pidstat -u -p $pid 1
 
+# 下面三行命令用于绘制火焰图
 sudo perf record -F 99 -g -p $pid -- sleep 30
 sudo perf report
 sudo perf script | stackcollapse-perf.pl | flamegraph.pl > cpu.svg
@@ -291,7 +292,7 @@ flamegraph.pl --color=io --countname us /tmp/offcpu.stacks > offcpu.svg
 ```bash
 wrk -t8 -c400 -d60s "http://$SERVER_ADDR:$SERVER_PORT/"
 ```
-在**服务机**：
+在**服务机**观测：
 ```bash
 sar -n DEV 1
 ss -tin
