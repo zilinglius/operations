@@ -80,7 +80,6 @@ import (
 	"net/http"
 	"os"
 	"runtime"
-	"runtime/pprof"
 	"strconv"
 	"time"
 
@@ -171,14 +170,12 @@ func main() {
 	if err := s.ListenAndServe(); err != nil {
 		panic(err)
 	}
-
-	_ = pprof // 引用以避免静态分析误报
 }
 ```
 
 **构建与运行**
 ```bash
-go build -o demo main.go
+go build -o demo ./main.go
 ./demo
 # 健康检查（非回环地址）
 curl -s http://$SERVER_ADDR:$SERVER_PORT/
