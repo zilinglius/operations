@@ -297,7 +297,15 @@ ss -tin
 **Little’s Law**：`L ≈ λ × W`（`λ`=RPS，`W`=平均响应时间秒）→ 推断并发在途请求量，评估线程/协程规模。
 
 ---
+## 单机场景下的配置优化（绑核、固定CPU频率）
+```bash
+# 进程绑核（分开核簇），下面例子假设有8个核，demo使用6个核，wrk使用2个核
+taskset -c 2-7 ./demo
+taskset -c 0-1 wrk -t2 -c200 -d60s http://127.0.0.1:8080/cpu?n=42
 
+# 固定CPU频率（可选）
+sudo cpupower frequency-set -g performance
+```
 ## 网络隔离模式（单机也不用 127.0.0.1）
 
 当只有一台服务器也需要做网络实验：将“客户端”与“服务端”放入不同 netns（`cli`/`srv`），服务仍监听 `:8080` 于 `srv`，并在**宿主机**通过 DNAT/SNAT 让 `cli` 以 **$SERVER_ADDR** 访问：
