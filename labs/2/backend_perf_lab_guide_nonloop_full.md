@@ -269,18 +269,58 @@ go tool pprof -http=:0 http://$SERVER_ADDR:$SERVER_PORT/debug/pprof/heap
 
 ---
 
-### 步骤 5：系统调用与锁竞争（**单机模式**）
-**目的**：定位 off-CPU 等待（锁、I/O、调度）。  
+### 步骤 5：系统调用与锁竞争（**多机模式**）
+**目的**：在**有负载**的情况下定位 off-CPU 等待（锁、I/O、调度）。
+
+#### 5.1 施加负载（在**负载机**）
+> 按目标选择端点：  
+> - **系统调用 / 磁盘路径**：`/io`（大量 `write/fsync`）  
+> - **锁 / 调度等待**：`/cpu`（goroutine 竞争多，常见 `futex/semacquire`）  
+> - **GC / 内存热点**：`/alloc`（高分配率）
+
+**多机（推荐）** 在负载机执行其一：
 ```bash
+# 注意wrk的参数设置，从小到大，知道发现问题
+wrk -t8 -c400 -d90s "http://$SERVER_ADDR:$SERVER_PORT/io?bs_kb=1024&count=1024"
+# 或：
+# wrk -t8 -c400 -d90s "http://$SERVER_ADDR:$SERVER_PORT/cpu?n=42"
+# wrk -t8 -c800 -d90s "http://$SERVER_ADDR:$SERVER_PORT/alloc?kb=25600"
+```
+
+> 建议让压测持续 **90s**，以便与 30s 的采样**时间重叠**。
+
+#### 5.2 同步观测（在**服务机**另一个终端**同时**进行）
+```bash
+pid=$(pidof demo)
+
+# 1) 系统调用分布（top-N）
+sudo strace -c -p $pid -f -qq -w -t -T -o /tmp/strace.txt -- sleep 30
+cat /tmp/strace.txt
+
+# 2) on-CPU 采样（调用栈 + 热点）
+sudo perf record -F 99 -g -p $pid -- sleep 30
+sudo perf report
+
+# 3) off-CPU 等待（锁/I-O/调度）——可选
+sudo offcputime-bpfcc -p $pid 30 > /tmp/offcpu.stacks
+flamegraph.pl --color=io --countname us /tmp/offcpu.stacks > offcpu.svg
+```
+
+> **同步技巧**：先启动 5.1 压测，**马上**执行 5.2 的命令；保持 30s 重叠可得到更稳定信号。
+
+**只有一个终端也行（自动化）**
+```bash
+( wrk -t8 -c400 -d90s "http://$SERVER_ADDR:$SERVER_PORT/io?bs_kb=1024&count=1024" & )
+sleep 5
 pid=$(pidof demo)
 sudo strace -c -p $pid -f -qq -w -t -T -o /tmp/strace.txt -- sleep 30
 sudo perf record -F 99 -g -p $pid -- sleep 30
-# off-CPU 可选：
-sudo offcputime-bpfcc -p $pid 10 > /tmp/offcpu.stacks
-flamegraph.pl --color=io --countname us /tmp/offcpu.stacks > offcpu.svg
 ```
-**判据**：`futex`/`semacquire` 等占比高 → **锁竞争/临界区过长**。
 
+**判读要点**
+- **`strace -c`**：系统调用占比（`write`, `fsync`, `futex`, `epoll_wait` 等）。  
+- **`perf report`**（on-CPU）：算力热点是否集中在业务函数或 runtime。  
+- **`offcputime` 火焰图**：`futex/semacquire` 宽且集中 → 锁竞争/临界区过长；I/O 路径宽 → I/O 等待显著。
 ---
 
 ### 步骤 6：网络层状况与容量估算（**多机模式优先**；无二机→网络隔离）
