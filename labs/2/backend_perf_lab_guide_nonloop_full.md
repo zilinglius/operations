@@ -294,7 +294,7 @@ wrk -t8 -c400 -d90s "http://$SERVER_ADDR:$SERVER_PORT/io?bs_kb=1024&count=1024"
 pid=$(pidof demo)
 
 # 1) 系统调用分布（top-N）
-sudo strace -c -p $pid -f -qq -w -t -T -o /tmp/strace.txt -- sleep 30
+sudo timeout 30s strace -c -p $pid -f -qq -w -o /tmp/strace.txt
 cat /tmp/strace.txt
 
 # 2) on-CPU 采样（调用栈 + 热点）
@@ -313,7 +313,7 @@ flamegraph.pl --color=io --countname us /tmp/offcpu.stacks > offcpu.svg
 ( wrk -t8 -c400 -d90s "http://$SERVER_ADDR:$SERVER_PORT/io?bs_kb=1024&count=1024" & )
 sleep 5
 pid=$(pidof demo)
-sudo strace -c -p $pid -f -qq -w -t -T -o /tmp/strace.txt -- sleep 30
+sudo timeout 30s strace -c -p $pid -f -qq -w -o /tmp/strace.txt 
 sudo perf record -F 99 -g -p $pid -- sleep 30
 ```
 
