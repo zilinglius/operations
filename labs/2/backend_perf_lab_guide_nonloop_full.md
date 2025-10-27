@@ -303,7 +303,7 @@ sudo perf record -F 99 -g -p $pid -- sleep 30
 sudo perf report
 
 # 3) off-CPU 等待（锁/I-O/调度）——可选
-sudo offcputime-bpfcc -p $pid 30 > /tmp/offcpu.stacks
+sudo offcputime-bpfcc -p $pid -d 30 -f > /tmp/offcpu.stacks
 flamegraph.pl --color=io --countname us /tmp/offcpu.stacks > offcpu.svg
 ```
 
