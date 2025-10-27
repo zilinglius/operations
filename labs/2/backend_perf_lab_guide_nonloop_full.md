@@ -263,7 +263,8 @@ pid=$(pidof demo)
 pidstat -r -p $pid 1
 pmap -x $pid | tail -n 1
 go tool pprof -top   http://$SERVER_ADDR:$SERVER_PORT/debug/pprof/profile?seconds=30
-go tool pprof -http=:0 http://$SERVER_ADDR:$SERVER_PORT/debug/pprof/heap
+# ip改为ecs的公网地址，然后可以在自己电脑浏览器访问，，注意还要设置安全组
+go tool pprof -http=ip:8081 http://$SERVER_ADDR:$SERVER_PORT/debug/pprof/heap
 ```
 **判据**：堆增大/GC 频繁/分配热点明显 → **内存/GC 瓶颈**。
 
@@ -401,6 +402,7 @@ flamegraph.pl --color=io --countname us --title "Off-CPU FlameGraph" \
 
 ### C. Go pprof（CPU/Heap）
 ```bash
+# ip改为ecs的公网地址，然后可以在自己电脑浏览器访问，，注意还要设置安全组
 # CPU 30s
 go tool pprof -http=:0 http://$SERVER_ADDR:$SERVER_PORT/debug/pprof/profile?seconds=30
 # Heap
