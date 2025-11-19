@@ -28,8 +28,8 @@
 |---|---|---|---|
 | 负载机 | `lab-load` | 执行 `wrk`/`hey` 压测，收集延迟分位值 | 无常驻端口 |
 | 负载均衡器 | `lab-lb` | 运行 HAProxy（可选 Nginx/Envoy），统一入口 | `80/tcp、8404/tcp（stats）` |
-| 后端 A | `lab-app-a` | 运行 `labs/3/backend` 服务实例 A | `8080/tcp` |
-| 后端 B | `lab-app-b` | 运行 `labs/3/backend` 服务实例 B | `8080/tcp` |
+| 后端 A | `lab-app-a` | 运行 `labs/3/backend` 服务实例 A | `8080/tcp`、`8090/tcp (agent)` |
+| 后端 B | `lab-app-b` | 运行 `labs/3/backend` 服务实例 B | `8080/tcp`、`8090/tcp (agent)` |
 
 > 需要至少两块真实网卡（或云环境内网）来观察网络队列、吞吐与连接状态。  
 > 若暂时只能单机，请在文末“扩展任务”中参考 `netns + veth` 的替代方案，但正式评估请优先多机环境。
@@ -92,6 +92,7 @@ go build -o backend-server ./...
   -service api-lab \
   -instance app-a \
   -listen :8080 \
+  -agent-listen :8090 \
   -target-latency-ms 80 \
   -max-inflight-safe 150 &
 
@@ -101,6 +102,7 @@ BASE_SLEEP_MS=20 TARGET_LATENCY_MS=120 \
   -service api-lab \
   -instance app-b \
   -listen :8080 \
+  -agent-listen :8090 \
   -latency-sample 128 &
 ```
 
@@ -214,7 +216,7 @@ curl -I http://lab-lb/
      ```bash
      sudo pkill backend-server || true
      BASE_SLEEP_MS=40 FAIL_RATE=0.02 ./backend-server \
-       -service api-lab -instance app-b -listen :8080 &
+       -service api-lab -instance app-b -listen :8080 agent-listen :8090 &
      ```  
    - 重复压测，观察权重与连接分布是否贴近预期。
 
@@ -248,9 +250,9 @@ curl -I http://lab-lb/
    backend be_app
      balance roundrobin
      option httpchk GET /healthz
-     default-server agent-check agent-port 8080 agent-inter 1s
-     server app_a lab-app-a:8080 check agent-addr lab-app-a
-     server app_b lab-app-b:8080 check agent-addr lab-app-b
+     default-server agent-check agent-port 8090 agent-inter 1s
+     server app_a lab-app-a:8080 check weight 50 agent-addr lab-app-a
+     server app_b lab-app-b:8080 check weight 50 agent-addr lab-app-b
    ```
 
    重载 HAProxy 并确认 `show servers state be_app` 中可以看到 `agent` 权重列。
@@ -271,7 +273,7 @@ curl -I http://lab-lb/
      ```bash
      sudo pkill backend-server || true
      FAIL_RATE=0.2 ./backend-server \
-       -service api-lab -instance app-a -listen :8080 &
+       -service api-lab -instance app-a -listen :8080 -agent-listen :8090 &
      ```  
    - 观察 `/agent` 返回值：  
      ```bash

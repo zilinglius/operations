@@ -28,15 +28,15 @@ type latencyPercentiles struct {
 
 // latencySnapshot 汇总延迟统计信息，包括样本数量、平均值、指数加权平均等。
 type latencySnapshot struct {
-	SampleSize int               `json:"sample_size"`
-	Average    float64           `json:"average_ms"`
-	EWMA       float64           `json:"ewma_ms"`
+	SampleSize int                `json:"sample_size"`
+	Average    float64            `json:"average_ms"`
+	EWMA       float64            `json:"ewma_ms"`
 	Percentile latencyPercentiles `json:"percentiles"`
 }
 
 // counterSnapshot 表示计数器指标，用于记录总请求数和错误响应数。
 type counterSnapshot struct {
-	TotalRequests uint64 `json:"total_requests"`
+	TotalRequests  uint64 `json:"total_requests"`
 	ErrorResponses uint64 `json:"error_responses"`
 }
 
@@ -56,31 +56,31 @@ type runtimeSnapshot struct {
 
 // metricsSnapshot 将所有指标打包成一句话，便于一次性序列化返回。
 type metricsSnapshot struct {
-	Service   string           `json:"service"`
-	Instance  string           `json:"instance"`
-	Version   string           `json:"version"`
-	Host      string           `json:"host"`
-	Timestamp time.Time        `json:"timestamp"`
-	Counters  counterSnapshot  `json:"counters"`
-	Gauges    gaugeSnapshot    `json:"gauges"`
-	Latency   latencySnapshot  `json:"latency"`
-	Runtime   runtimeSnapshot  `json:"runtime"`
+	Service   string          `json:"service"`
+	Instance  string          `json:"instance"`
+	Version   string          `json:"version"`
+	Host      string          `json:"host"`
+	Timestamp time.Time       `json:"timestamp"`
+	Counters  counterSnapshot `json:"counters"`
+	Gauges    gaugeSnapshot   `json:"gauges"`
+	Latency   latencySnapshot `json:"latency"`
+	Runtime   runtimeSnapshot `json:"runtime"`
 }
 
 // backendResponse 是后端对外暴露的响应结构，便于前端或实验脚本消费。
 type backendResponse struct {
-	Service     string                 `json:"service"`
-	Instance    string                 `json:"instance"`
-	Version     string                 `json:"version"`
-	Host        string                 `json:"host"`
-	Timestamp   time.Time              `json:"timestamp"`
-	RequestID   string                 `json:"request_id"`
-	Route       string                 `json:"route"`
-	DurationMS  float64                `json:"duration_ms"`
-	Status      int                    `json:"status"`
-	Workload    map[string]any         `json:"workload"`
-	MetricsHint map[string]any         `json:"metrics_hint"`
-	Payload     string                 `json:"payload,omitempty"`
+	Service     string         `json:"service"`
+	Instance    string         `json:"instance"`
+	Version     string         `json:"version"`
+	Host        string         `json:"host"`
+	Timestamp   time.Time      `json:"timestamp"`
+	RequestID   string         `json:"request_id"`
+	Route       string         `json:"route"`
+	DurationMS  float64        `json:"duration_ms"`
+	Status      int            `json:"status"`
+	Workload    map[string]any `json:"workload"`
+	MetricsHint map[string]any `json:"metrics_hint"`
+	Payload     string         `json:"payload,omitempty"`
 }
 
 // metricsStore 管理内存中的监控指标，使用互斥锁确保并发安全。
@@ -89,14 +89,14 @@ type metricsStore struct {
 
 	inflight atomic.Int64
 
-	mu               sync.Mutex
-	totalRequests    uint64
-	errorResponses   uint64
-	totalLatency     time.Duration
-	ewmaLatencyMs    float64
-	latencySamples   []time.Duration // 使用环形数组存储最近的延迟样本
-	latencyCount     int             // 当前有效样本数量
-	latencyWriteIndex int            // 环形写入索引
+	mu                sync.Mutex
+	totalRequests     uint64
+	errorResponses    uint64
+	totalLatency      time.Duration
+	ewmaLatencyMs     float64
+	latencySamples    []time.Duration // 使用环形数组存储最近的延迟样本
+	latencyCount      int             // 当前有效样本数量
+	latencyWriteIndex int             // 环形写入索引
 }
 
 // newMetricsStore 创建指标存储对象，并为延迟样本预留空间。
@@ -195,7 +195,7 @@ func (ms *metricsStore) snapshot(meta metadata) metricsSnapshot {
 		Host:      meta.host,
 		Timestamp: time.Now().UTC(),
 		Counters: counterSnapshot{
-			TotalRequests: ms.totalRequests,
+			TotalRequests:  ms.totalRequests,
 			ErrorResponses: ms.errorResponses,
 		},
 		Gauges: gaugeSnapshot{
@@ -223,23 +223,23 @@ func (ms *metricsStore) snapshot(meta metadata) metricsSnapshot {
 
 // metadata 表示服务元信息，用于统一填充响应与指标中的身份字段。
 type metadata struct {
-	service string
-	instance string
-	version string
-	host string
+	service        string
+	instance       string
+	version        string
+	host           string
 	defaultPayload string
 }
 
 // workloadConfig 描述一次请求的工作负载参数，既可以来自环境变量，也可以被查询参数覆盖。
 type workloadConfig struct {
-	baseCPUMillis    int
-	baseSleepMillis  int
-	maxPayloadBytes  int
-	defaultPayload   string
-	jitterMillis     int
-	failRate         float64
-	targetLatencyMs  float64
-	maxInflightSafe  int64
+	baseCPUMillis   int
+	baseSleepMillis int
+	maxPayloadBytes int
+	defaultPayload  string
+	jitterMillis    int
+	failRate        float64
+	targetLatencyMs float64
+	maxInflightSafe int64
 }
 
 // envOrDefault 封装“环境变量覆盖默认值”的常见模式。
@@ -338,16 +338,16 @@ func clampFloat(value, min, max float64) float64 {
 // newBackendResponse 根据当前请求生成响应体，同时附带一份指标提示信息。
 func newBackendResponse(meta metadata, reqID string, route string, status int, duration time.Duration, workload map[string]any, payload string, snapshot metricsSnapshot) backendResponse {
 	return backendResponse{
-		Service:     meta.service,
-		Instance:    meta.instance,
-		Version:     meta.version,
-		Host:        meta.host,
-		Timestamp:   time.Now().UTC(),
-		RequestID:   reqID,
-		Route:       route,
-		DurationMS:  float64(duration/time.Microsecond) / 1000.0,
-		Status:      status,
-		Workload:    workload,
+		Service:    meta.service,
+		Instance:   meta.instance,
+		Version:    meta.version,
+		Host:       meta.host,
+		Timestamp:  time.Now().UTC(),
+		RequestID:  reqID,
+		Route:      route,
+		DurationMS: float64(duration/time.Microsecond) / 1000.0,
+		Status:     status,
+		Workload:   workload,
 		MetricsHint: map[string]any{
 			"ewma_latency_ms": snapshot.Latency.EWMA,
 			"avg_latency_ms":  snapshot.Latency.Average,
@@ -480,6 +480,44 @@ func parseQueryParams(r *http.Request) map[string]string {
 	return q
 }
 
+// agent 是给 HAProxy agent-check 用的 TCP 处理函数。
+// 它会根据当前指标计算一个推荐权重，并按 agent-check 协议返回：
+//   - 出错率很高：down # reason
+//   - 否则：up <weight>% # reason
+func agent(ms *metricsStore, meta metadata, cfg workloadConfig, conn net.Conn) {
+	defer conn.Close()
+
+	// 取一份快照，不会长时间持锁
+	snapshot := ms.snapshot(meta)
+	weight, reason := recommendedWeight(snapshot, cfg)
+
+	status := "up"
+	if snapshot.Counters.TotalRequests > 0 {
+		errRatio := float64(snapshot.Counters.ErrorResponses) / float64(snapshot.Counters.TotalRequests)
+		// 出错率太高，直接让 HAProxy 把这个实例摘掉
+		if errRatio > 0.25 {
+			status = "down"
+			reason = "error_ratio_gt_25pct"
+		}
+	}
+
+	var line string
+	if status == "down" {
+		// down 后面可以跟 # 注释，HAProxy 会忽略 # 之后的内容
+		line = "down # " + reason + "\n"
+	} else {
+		// 注意：这里的 weight 是 1~100 的百分比，必须带上 %，例如 "80%\n"
+		// HAProxy 会按 “当前配置权重 * weight%” 来生效
+		line = fmt.Sprintf("up %d%% # %s\n", weight, reason)
+	}
+
+	if _, err := conn.Write([]byte(line)); err != nil {
+		log.Printf("agent-check: failed to write response: %v", err)
+	} else {
+		log.Printf("agent-check: %s", line)
+	}
+}
+
 // main 中组装服务器配置、注册路由，并启动 HTTP 服务。
 func main() {
 	// flag 区域定义 CLI 参数，也支持环境变量覆盖，便于在容器或脚本中注入配置。
@@ -490,6 +528,8 @@ func main() {
 	flagSampleSize := flag.Int("latency-sample", parseEnvInt("LATENCY_SAMPLE_SIZE", 64), "latency sample size for percentile estimates")
 	flagTargetLatency := flag.Float64("target-latency-ms", parseEnvFloat("TARGET_LATENCY_MS", 80), "target latency for adaptive weight calculation")
 	flagMaxInflight := flag.Int64("max-inflight-safe", parseEnvInt64("MAX_INFLIGHT_SAFE", 120), "in-flight request threshold before reducing weight")
+	flagAgentListen := flag.String("agent-listen", envOrDefault("AGENT_LISTEN_ADDR", ":8090"), "listen address for HAProxy agent-check (tcp)")
+
 	flag.Parse()
 
 	host, err := os.Hostname()
@@ -504,10 +544,10 @@ func main() {
 
 	// meta 存储服务身份信息，用于响应与指标的统一输出。
 	meta := metadata{
-		service: envOrDefault("SERVICE_NAME", *flagService),
-		instance: instance,
-		version: envOrDefault("SERVICE_VERSION", *flagVersion),
-		host: host,
+		service:        envOrDefault("SERVICE_NAME", *flagService),
+		instance:       instance,
+		version:        envOrDefault("SERVICE_VERSION", *flagVersion),
+		host:           host,
 		defaultPayload: envOrDefault("DEFAULT_PAYLOAD", "hello from backend"),
 	}
 
@@ -526,7 +566,36 @@ func main() {
 	// 指标存储负责聚合延迟、错误率等信息。
 	ms := newMetricsStore(*flagSampleSize)
 	// 随机数种子确保每个实例的行为独立。
-	rand.Seed(time.Now().UnixNano())
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano() + int64(os.Getpid())))
+
+	// 启动 agent-check TCP 服务，供 HAProxy 使用
+	if *flagAgentListen != "" {
+		go func() {
+			ln, err := net.Listen("tcp", *flagAgentListen)
+			if err != nil {
+				log.Printf("failed to listen for agent on %s: %v", *flagAgentListen, err)
+				return
+			}
+			log.Printf("agent-check listening on %s", *flagAgentListen)
+
+			for {
+				conn, err := ln.Accept()
+
+				log.Println("agent-check")
+
+				if err != nil {
+					if ne, ok := err.(net.Error); ok && ne.Temporary() {
+						log.Printf("temporary error accepting agent connection: %v", err)
+						continue
+					}
+					log.Printf("agent listener stopped: %v", err)
+					return
+				}
+				// 每个连接独立计算一次权重并返回
+				go agent(ms, meta, cfg, conn)
+			}
+		}()
+	}
 
 	// 主处理函数：接收根路径请求，模拟 CPU/IO 开销并返回 JSON。
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -573,13 +642,13 @@ func main() {
 
 		spin(cpuMs)
 		if jitterMs > 0 {
-			randomSleep(rand.Intn(jitterMs + 1))
+			randomSleep(rnd.Intn(jitterMs + 1))
 		}
 		randomSleep(sleepMs)
 
 		// 按失败率注入 500 错误，以便观察负载均衡的容错策略。
 		status := http.StatusOK
-		if failRate > 0 && rand.Float64() < failRate {
+		if failRate > 0 && rnd.Float64() < failRate {
 			status = http.StatusInternalServerError
 		}
 
@@ -596,7 +665,7 @@ func main() {
 		w.Header().Set("X-Backend-Inflight", strconv.FormatInt(currentInflight, 10))
 		w.WriteHeader(status)
 
-		resp := newBackendResponse(meta, fmt.Sprintf("%s-%d", meta.instance, rand.Int63()), r.URL.Path, status, duration, traceWorkload(cfg, queryParams), makePayload(meta.defaultPayload, payloadBytes), snapshot)
+		resp := newBackendResponse(meta, fmt.Sprintf("%s-%d", meta.instance, rnd.Int63()), r.URL.Path, status, duration, traceWorkload(cfg, queryParams), makePayload(meta.defaultPayload, payloadBytes), snapshot)
 
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			log.Printf("failed to encode response: %v", err)
@@ -630,14 +699,14 @@ func main() {
 		weight, reason := recommendedWeight(snapshot, cfg)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		if snapshot.Counters.TotalRequests == 0 {
-			fmt.Fprintf(w, "up %d\n", weight)
+			fmt.Fprintf(w, "up %d%%\n", weight)
 			return
 		}
 		if snapshot.Counters.ErrorResponses > 0 && float64(snapshot.Counters.ErrorResponses)/float64(snapshot.Counters.TotalRequests) > 0.25 {
 			fmt.Fprintf(w, "down\n")
 			return
 		}
-		fmt.Fprintf(w, "up %d # %s\n", weight, reason)
+		fmt.Fprintf(w, "up %d%% # %s\n", weight, reason)
 	})
 
 	server := &http.Server{
